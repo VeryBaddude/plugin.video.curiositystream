@@ -1,0 +1,2 @@
+0.1.0 (26/4/2016)
+-  Initial limited release for testing purposes.
