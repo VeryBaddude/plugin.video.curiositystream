@@ -28,8 +28,11 @@ home_url = base_url + 'sections/3/mobile?cache=true&collections=true&media_limit
 videoPage_url = base_url + 'media/'
 cat_url = base_url + 'categories'
 collect_url = base_url + 'collections/'
-tokenFile = xbmc.translatePath('special://home/addons/'+addonID+'/resources/data/token.txt')
 token = ''
+
+__addon__ = xbmcaddon.Addon()
+data_path = xbmc.translatePath(__addon__.getAddonInfo('profile'))
+tokenFile = os.path.join(__addon__.getAddonInfo('path'), 'resources', 'data', 'token.txt')
 
 # Write debug entry to kodi.log
 def debug(txt):
@@ -268,6 +271,8 @@ label = urllib.unquote_plus(params.get('label', ''))
 videoID = urllib.unquote_plus(params.get('id', ''))
 collection = urllib.unquote_plus(params.get('collection', ''))
 fanart = urllib.unquote_plus(params.get('fanart', ''))
+
+debug('tokenFile = ' + tokenFile)
 
 if action == 'listing':
 	listVideos(type, name, label)
