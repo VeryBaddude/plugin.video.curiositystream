@@ -24,7 +24,7 @@ user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 addonID = 'plugin.video.curiositystream'
 base_url = 'https://api.curiositystream.com/v1/'
 login_url = base_url + 'login'
-home_url = base_url + 'sections/3/mobile?cache=true&collections=true&media_limit=1'
+home_url = base_url + 'sections/1/mobile?cache=true&collections=true&media_limit=1'
 videoPage_url = base_url + 'media/'
 cat_url = base_url + 'categories'
 collect_url = base_url + 'collections/'
@@ -33,6 +33,7 @@ token = ''
 __addon__ = xbmcaddon.Addon()
 data_path = xbmc.translatePath(__addon__.getAddonInfo('profile'))
 tokenFile = os.path.join(__addon__.getAddonInfo('path'), 'resources', 'data', 'token.txt')
+media_path = os.path.join(__addon__.getAddonInfo('path'), 'resources', 'media')
 
 
 # Write debug entry to kodi.log
@@ -139,21 +140,55 @@ def list_categories(token):
     categories = temp['data']
     cat = {}
     for category in categories:
-        cat[category['name']] = category['image_url']
+        cat[category['name']] = {'image': category['image_url'],
+                                 'banner': category['header_url'],
+                                 'background': category['background_url']}
 
     # Loop through the groupings returned
-    for group in groupings:
+    for (ndx,group) in enumerate(groupings):
         list_item = xbmcgui.ListItem(label=group['label'])
         url = '{0}?action=listing&type={1}&name={2}&label={3}'.format(__url__, urllib.quote_plus(group['type']),
                                                                       urllib.quote_plus(group['name']),
                                                                       urllib.quote_plus(group['label']))
         debug('url = ' + url)
         if group['type'] == 'category':
-            debug('Setting art to ' + cat[group['name']])
-            list_item.setArt({'thumb': cat[group['name']], 'icon': cat[group['name']], 'fanart': cat[group['name']]})
-
+            list_item.setInfo('video', {'title':group['label']})
+            debug('Setting art to ' + cat[group['name']]['image'])
+            list_item.setArt({'thumb': cat[group['name']]['image'], 
+                              'icon': cat[group['name']]['image'], 
+                              'poster': cat[group['name']]['image'],
+                              'fanart': cat[group['name']]['image'],
+                              'banner': cat[group['name']]['banner']})
+        #elif group['type'] == 'custom':
+        #    debug('Setting art to ' + cat[group['name']])
+        else:
+            list_item.setInfo('video', {'title':group['label'], 'sorttitle':'{} {}'.format(ndx+1,group['label'])})
+            if len(group['media']) > 0:
+                debug('Setting art to ' + group['media'][0]['image_show'])
+                list_item.setArt({'thumb': group['media'][0]['image_show'], 
+                                  'icon': group['media'][0]['image_small'], 
+                                  'poster': group['media'][0]['image_show'],
+                                  'fanart': group['media'][0]['image_show'],
+                                  'banner': group['media'][0]['image_keyframe']})
+        
         listing.append((url, list_item, is_folder))
 
+    # Add the Watchlist as a group
+    list_item = xbmcgui.ListItem(label='Watchlist')
+    url = '{0}?action=listing&type={1}&name={2}&label={3}'.format(__url__,
+                                                                  'bookmarked',
+                                                                  'bookmarked',
+                                                                  'Watchlist')
+    #watchlist_image = 'https://art-u1.infcdn.net/articles_uploads/2014/02/TV-Apps.jpg'
+    watchlist_image = os.path.join(media_path,'tv-apps.jpg')
+    list_item.setArt({'thumb': watchlist_image,
+                      'icon': watchlist_image,
+                      'poster': watchlist_image,
+                      'fanart': watchlist_image})
+                      # Banner?
+    list_item.setInfo('video', {'sorttitle':'0 Watchlist'})
+    listing.append((url, list_item, is_folder))
+    
     # Add our listing to Kodi.
     xbmcplugin.addDirectoryItems(__handle__, listing, len(listing))
 
@@ -199,14 +234,14 @@ def listCollection(collectionID, fanart):
     xbmcplugin.endOfDirectory(__handle__)
 
 
-def listVideos(type, name, label):
+def listVideos(_type, name, label):
     xbmcplugin.setContent(__handle__, 'episodes')
     # Retrieve the token so we can make more authenticated calls to the web server.
     token = retrieveToken()
 
     page = 1
     url = 'https://api.curiositystream.com/v1/media?collections=true&filterBy={0}&limit=20&page={1}&term={2}'.format(
-        type, page, name)
+            _type, page, name)
     debug('Opening page at ' + url)
     source = getJSON(url, token)
 
@@ -216,31 +251,43 @@ def listVideos(type, name, label):
     totalPages = videos['paginator']['total_pages']
     debug('Total pages to retrieve = ' + str(totalPages))
 
-    while page < totalPages or page < 5:
+    while page < totalPages:
         for video in videos['data']:
             list_item = xbmcgui.ListItem(label=video['title'])
             # Set additional info for the list item.
-            list_item.setInfo('video', {'title': video['title'], 'genre': video['type'], 'year': video['year_produced'],
-                                        'rating': video['rating'], 'plot': video['description'],
-                                        'studio': video['producer']})
-            try:
-                list_item.setInfo('video', {'duration': int(video['duration'])})
-            except:
-                debug('Could not set duration for ' + video['title'])
-            else:
-                debug('Moving on...')
+            # Rating in Kodi is 0..10, here it is 0..5
+            # Playcount of at least 1 means its been watched, but don't have an accurate watch count
+            playcount = 0
+            if  video.get('user_media') is not None:
+                playcount = video.get('user_media').get('progress_percentage',0) > 75
+            list_item.setInfo('video', {'title': video['title'], 
+                                        'genre': video['type'], 
+                                        'year': video['year_produced'],
+                                        'rating': float(video['rating'])*2 if video['rating'] > 0 else None, 
+                                        'plot': video['description'],
+                                        'studio': video['producer'],
+                                        'tagline': video.get('display_tag',''),
+                                        'playcount':playcount})
 
-            list_item.setArt({'thumb': video['image_small'], 'fanart': video['image_large']})
+            list_item.setArt({'thumb': video['image_small'], 'poster': video['image_large']})
             if video['obj_type'] == 'collection':
                 debug('Video ' + video['title'] + ' is a collection')
                 list_item.setProperty('IsPlayable', 'false')
+                list_item.setArt({'fanart': video['image_large']})
                 url = '{0}?action=listCollection&id={1}&fanart={2}'.format(__url__, video['id'],
                                                                            urllib.quote_plus(video['image_medium']))
                 is_folder = True
             else:
                 is_folder = False
+                try:
+                    list_item.setInfo('video', {'duration': int(video['duration'])})
+                except:
+                    debug('Could not set duration for ' + video['title'])
+                else:
+                    debug('Moving on...')
+
                 list_item.setProperty('IsPlayable', 'true')
-                list_item.setArt({'icon': video['image_medium']})
+                list_item.setArt({'icon': video['image_medium'], 'fanart': video['image_keyframe']})
                 url = '{0}?action=play&collection={1}&id={2}'.format(__url__, is_folder, video['id'])
                 debug('Video ' + video['title'] + ' is NOT a collection')
 
@@ -249,7 +296,7 @@ def listVideos(type, name, label):
 
         page += 1
         url = 'https://api.curiositystream.com/v1/media?collections=true&filterBy={0}&limit=20&page={1}&term={2}'.format(
-            type, page, name)
+            _type, page, name)
         debug('Opening page at ' + url)
         source = getJSON(url, token)
         videos = json.loads(source)
@@ -286,7 +333,7 @@ def play(videoID):
 
 params = parameters_string_to_dict(sys.argv[2])
 action = urllib.unquote_plus(params.get('action', ''))
-type = urllib.unquote_plus(params.get('type', ''))
+_type = urllib.unquote_plus(params.get('type', ''))
 name = urllib.unquote_plus(params.get('name', ''))
 label = urllib.unquote_plus(params.get('label', ''))
 videoID = urllib.unquote_plus(params.get('id', ''))
@@ -296,7 +343,7 @@ fanart = urllib.unquote_plus(params.get('fanart', ''))
 debug('tokenFile = ' + tokenFile)
 
 if action == 'listing':
-    listVideos(type, name, label)
+    listVideos(_type, name, label)
 elif action == 'play':
     play(videoID)
 elif action == 'listCollection':
