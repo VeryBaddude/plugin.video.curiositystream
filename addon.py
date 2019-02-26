@@ -164,11 +164,11 @@ def list_categories(token):
         else:
             list_item.setInfo('video', {'title':group['label'], 'sorttitle':'{} {}'.format(ndx+1,group['label'])})
             if len(group['media']) > 0:
-                debug('Setting art to ' + group['media'][0]['image_show'])
-                list_item.setArt({'thumb': group['media'][0]['image_show'], 
+                debug('Setting art to ' + group['media'][0]['image_small'])
+                list_item.setArt({'thumb': group['media'][0]['image_small'], 
                                   'icon': group['media'][0]['image_small'], 
-                                  'poster': group['media'][0]['image_show'],
-                                  'fanart': group['media'][0]['image_show'],
+                                  'poster': group['media'][0]['image_small'],
+                                  'fanart': group['media'][0]['image_small'],
                                   'banner': group['media'][0]['image_keyframe']})
         
         listing.append((url, list_item, is_folder))
