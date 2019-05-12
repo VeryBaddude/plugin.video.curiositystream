@@ -153,14 +153,14 @@ def list_categories(token):
         debug('url = ' + url)
         if group['type'] == 'category':
             list_item.setInfo('video', {'title':group['label']})
-            debug('Setting art to ' + cat[group['name']]['image'])
-            list_item.setArt({'thumb': cat[group['name']]['image'], 
-                              'icon': cat[group['name']]['image'], 
-                              'poster': cat[group['name']]['image'],
-                              'fanart': cat[group['name']]['image'],
-                              'banner': cat[group['name']]['banner']})
-        #elif group['type'] == 'custom':
-        #    debug('Setting art to ' + cat[group['name']])
+            category_name = group['label'].lower()
+            if category_name in cat.keys():
+                debug('Setting art to ' + cat[category_name]['image'])
+                list_item.setArt({'thumb': cat[category_name]['image'], 
+                                  'icon': cat[category_name]['image'], 
+                                  'poster': cat[category_name]['image'],
+                                  'fanart': cat[category_name]['image'],
+                                  'banner': cat[category_name]['banner']})
         else:
             list_item.setInfo('video', {'title':group['label'], 'sorttitle':'{} {}'.format(ndx+1,group['label'])})
             if len(group['media']) > 0:
@@ -169,7 +169,7 @@ def list_categories(token):
                                   'icon': group['media'][0]['image_small'], 
                                   'poster': group['media'][0]['image_small'],
                                   'fanart': group['media'][0]['image_small'],
-                                  'banner': group['media'][0]['image_keyframe']})
+                                  'banner': group['media'][0]['image_small']})
         
         listing.append((url, list_item, is_folder))
 
