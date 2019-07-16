@@ -60,6 +60,8 @@ def getJSON(url, token):
     req.add_header('Content-Type', 'application/json')
     req.add_header('Referer', 'https://app.curiositystream.com/')
     req.add_header('Origin', 'https://app.curiositystream.com')
+    req.add_header('X-Platform', 'kodi')
+    req.add_header('X-Client-Version', VeryBaddude/plugin.video.curiositystream)
     response = urllib2.urlopen(req)
     source = response.read()
     response.close()
